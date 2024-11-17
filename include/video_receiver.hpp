@@ -10,7 +10,7 @@
 #include <atomic>
 #include <memory>
 
-using boost::asio::ip::tcp;
+using boost::asio::ip::udp;
 
 class VideoReceiver {
 public:
@@ -21,7 +21,7 @@ public:
     void start();
 
 private:
-    void handleClient(std::shared_ptr<tcp::socket> socket);
+    void receiveFrames();
     void displayFrames(int videoWidth, int videoHeight, int targetFPS);
 
     unsigned short port_;
@@ -29,14 +29,14 @@ private:
     unsigned short videoWidth_;
     unsigned short videoHeight_;
     boost::asio::io_context ioContext_;
-    tcp::acceptor acceptor_;
+    udp::socket socket_;
 
     static std::queue<cv::Mat> frameQueue;
     static std::mutex queueMutex;
     static std::condition_variable frameCondVar;
     static std::atomic<bool> stopDisplay;
 
-    static constexpr size_t maxQueueSize = 10;
+    static constexpr size_t maxQueueSize = 100;
 };
 
 #endif // VIDEO_RECEIVER_HPP

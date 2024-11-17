@@ -7,8 +7,9 @@
 #include <thread>
 #include <atomic>
 #include <vector>
+#include <memory>
 
-using boost::asio::ip::tcp;
+using boost::asio::ip::udp;
 
 enum class VideoSourceType {
     VIDEO_FILE,
@@ -23,8 +24,7 @@ public:
 
 private:
     void captureVideo();
-    void sendVideo();
-    bool connectToServer();
+    void sendFrame();
 
     std::string ip_;
     unsigned short port_;
@@ -33,9 +33,10 @@ private:
     VideoSourceType sourceType_;
     std::atomic<bool> stopFlag_;
     boost::asio::io_context ioContext_;
-    tcp::socket socket_;
+    udp::socket socket_;
     std::mutex frameMutex_;
     cv::Mat sharedFrame_;
+    std::vector<uchar> buffer_;
     unsigned short targetFPS_;
 };
 

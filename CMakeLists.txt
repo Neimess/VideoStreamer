@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.27)
 project(VideoStreamer)
 
 # Устанавливаем стандарт C++
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Настраиваем пути к OpenCV и Boost
@@ -35,7 +35,7 @@ include_directories(include)
 # Устанавливаем директорию для выходных файлов
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-set(COMMON_FLAGS " -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wconversion -Wsign-conversion -Wdouble-promotion")
+#set(COMMON_FLAGS " -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wconversion -Wsign-conversion -Wdouble-promotion")
 
 # Флаги компиляции для отладочной и релизной сборки
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 ${COMMON_FLAGS}")

@@ -8,7 +8,7 @@ std::atomic<bool> VideoReceiver::stopDisplay = false;
 
 VideoReceiver::VideoReceiver(unsigned short port, unsigned short targetFPS, unsigned short videoWidth, unsigned short videoHeight)
     : port_(port), targetFPS_(targetFPS), videoWidth_(videoWidth), videoHeight_(videoHeight),
-      acceptor_(ioContext_, tcp::endpoint(tcp::v4(), port_)) {}
+      socket_(ioContext_, udp::endpoint(udp::v4(), port_)) {}
 
 void VideoReceiver::start() {
     Logger::getInstance().log("Server starts, waiting for senders...");
@@ -17,42 +17,48 @@ void VideoReceiver::start() {
         displayFrames(videoWidth_, videoHeight_, targetFPS_);
     });
     displayThread.detach();
-
-    while (!stopDisplay) {
-        auto socket = std::make_shared<tcp::socket>(ioContext_);
-        acceptor_.accept(*socket);
-        std::string clientIp = socket->remote_endpoint().address().to_string();
-        int clientPort = socket->remote_endpoint().port();
-        Logger::getInstance().log("Sender connected: " + clientIp + ":" + std::to_string(clientPort));
-
-        std::thread clientThread(&VideoReceiver::handleClient, this, socket);
-        clientThread.detach();
-    }
-
+    receiveFrames();
     Logger::getInstance().log("Server stopped.");
 }
 
-void VideoReceiver::handleClient(std::shared_ptr<tcp::socket> socket) {
+void VideoReceiver::receiveFrames() {
     std::vector<uchar> buffer;
-    size_t estimatedBufferSize = static_cast<size_t>(videoWidth_) * static_cast<size_t>(videoHeight_) * 3; // 3 
+    size_t estimatedBufferSize = static_cast<size_t>(videoWidth_) * static_cast<size_t>(videoHeight_) * 3;
     buffer.reserve(estimatedBufferSize);
     Logger::getInstance().log("Estimated buffer size: " + std::to_string(estimatedBufferSize));
-    cv::Mat frame;
 
-    try {
-        while (!stopDisplay) {
+    udp::endpoint senderEndpoint;
+
+    while (!stopDisplay) {
+        try {
             uint32_t bufferSize;
-            boost::asio::read(*socket, boost::asio::buffer(&bufferSize, sizeof(bufferSize)));
+            size_t bytesReceived = socket_.receive_from(
+                boost::asio::buffer(&bufferSize, sizeof(bufferSize)), senderEndpoint);
+
+            if (bytesReceived != sizeof(bufferSize)) {
+                Logger::getInstance().log("Failed to receive buffer size. Skipping frame.");
+                continue;
+            }
+
+            if (bufferSize > estimatedBufferSize) {
+                Logger::getInstance().log("Received buffer size is too large. Skipping frame.");
+                continue;
+            }
+
 
             buffer.resize(bufferSize);
-            boost::asio::read(*socket, boost::asio::buffer(buffer));
+            bytesReceived = socket_.receive_from(boost::asio::buffer(buffer), senderEndpoint);
 
-            frame = cv::imdecode(buffer, cv::IMREAD_COLOR);
+            if (bytesReceived != bufferSize) {
+                Logger::getInstance().log("Incomplete frame data received. Skipping frame.");
+                continue;
+            }
+
+            cv::Mat frame = cv::imdecode(buffer, cv::IMREAD_COLOR);
             if (frame.empty()) {
                 Logger::getInstance().log("Failed to decode frame. Skipping.");
                 continue;
             }
-            boost::asio::write(*socket, boost::asio::buffer("T", 1));
 
             {
                 std::lock_guard<std::mutex> lock(queueMutex);
@@ -61,13 +67,10 @@ void VideoReceiver::handleClient(std::shared_ptr<tcp::socket> socket) {
                 }
             }
             frameCondVar.notify_one();
+        } catch (const std::exception &e) {
+            Logger::getInstance().log("Error receiving frame: " + std::string(e.what()));
         }
-    } catch (const std::exception& e) {
-        Logger::getInstance().log("Client handling error: " + std::string(e.what()));
     }
-
-    socket->close();
-    Logger::getInstance().log("Client connection closed.");
 }
 
 void VideoReceiver::displayFrames(int videoWidth, int videoHeight, int targetFPS) {
