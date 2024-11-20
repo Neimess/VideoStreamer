@@ -4,5 +4,5 @@ build
 *.mp4
 *.rar
 *.zip
-src/test/main.cpp
-src/test/CMakeLists.txt
+test
+test
