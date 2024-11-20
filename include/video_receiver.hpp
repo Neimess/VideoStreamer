@@ -1,40 +1,43 @@
 #ifndef VIDEO_RECEIVER_HPP
 #define VIDEO_RECEIVER_HPP
 
+#include "udp_receiver.hpp"
+#include "tcp_receiver.hpp"
 #include <opencv2/opencv.hpp>
-#include <boost/asio.hpp>
 #include <queue>
 #include <mutex>
 #include <condition_variable>
 #include <thread>
 #include <atomic>
-#include <memory>
-
-using boost::asio::ip::udp;
+#include <nlohmann/json.hpp>
+#include "logger.hpp"
+enum class ProtocolType { UDP, TCP };
 
 class VideoReceiver {
 public:
-    VideoReceiver(unsigned short port,
+    
+
+    VideoReceiver(ProtocolType protocol, unsigned short port,
                   unsigned short targetFPS = 30,
                   unsigned short videoWidth = 1280,
                   unsigned short videoHeight = 720);
+
     void start();
 
 private:
     void receiveFrames();
     void displayFrames(int videoWidth, int videoHeight, int targetFPS);
 
-    unsigned short port_;
+    ProtocolType protocol_;
     unsigned short targetFPS_;
     unsigned short videoWidth_;
     unsigned short videoHeight_;
-    boost::asio::io_context ioContext_;
-    udp::socket socket_;
 
-    static std::queue<cv::Mat> frameQueue;
-    static std::mutex queueMutex;
-    static std::condition_variable frameCondVar;
-    static std::atomic<bool> stopDisplay;
+    std::unique_ptr<Receiver> receiver_;
+    std::queue<cv::Mat> frameQueue;
+    std::mutex queueMutex;
+    std::condition_variable frameCondVar;
+    std::atomic<bool> stopDisplay;
 
     static constexpr size_t maxQueueSize = 100;
 };
